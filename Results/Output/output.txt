@@ -1,0 +1,38 @@
+iris meta-features: [150, 4, 3, np.float64(0.6931471805599453), np.float64(-1.4684549872375404e-15), np.float64(1.0)]
+digits meta-features: [1797, 64, 10, np.float64(0.7186804825651101), np.float64(3.212665402365506e-18), np.float64(0.9762812094883323)]
+wineqt meta-features: [1143, 12, 6, np.float64(4.400603020246817), np.float64(4.701206858430234e-15), np.float64(1.0)]
+
+Optimizing for iris...
+Best params: {'n_estimators': 90, 'max_depth': 3}
+Best accuracy: 0.9666666666666668
+
+Optimizing for digits...
+Best params: {'n_estimators': 94, 'max_depth': 10}
+Best accuracy: 0.9771804394924171
+
+Optimizing for wineqt...
+Best params: {'n_estimators': 85, 'max_depth': 10}
+Best accuracy: 0.6500574580556193
+
+Meta-features (X):
+[[ 1.50000000e+02  4.00000000e+00  3.00000000e+00  6.93147181e-01
+  -1.46845499e-15  1.00000000e+00]
+ [ 1.79700000e+03  6.40000000e+01  1.00000000e+01  7.18680483e-01
+   3.21266540e-18  9.76281209e-01]
+ [ 1.14300000e+03  1.20000000e+01  6.00000000e+00  4.40060302e+00
+   4.70120686e-15  1.00000000e+00]]
+
+Meta-targets (y):
+[[90  3]
+ [94 10]
+ [85 10]]
+
+--- Testing Meta-Learning ---
+
+Predicted hyperparameters:
+n_estimators: 89
+max_depth: 3
+
+Accuracy using meta-learning: 0.9533333333333333
+
+Results saved to results.json

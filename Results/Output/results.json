@@ -1,0 +1,31 @@
+{
+    "iris": {
+        "dataset": "iris",
+        "best_params": {
+            "n_estimators": 90,
+            "max_depth": 3
+        },
+        "accuracy": 0.9666666666666668
+    },
+    "digits": {
+        "dataset": "digits",
+        "best_params": {
+            "n_estimators": 94,
+            "max_depth": 10
+        },
+        "accuracy": 0.9771804394924171
+    },
+    "wineqt": {
+        "dataset": "wineqt",
+        "best_params": {
+            "n_estimators": 85,
+            "max_depth": 10
+        },
+        "accuracy": 0.6500574580556193
+    },
+    "meta_learning": {
+        "n_estimators": 89,
+        "max_depth": 3,
+        "accuracy": 0.9533333333333333
+    }
+}
