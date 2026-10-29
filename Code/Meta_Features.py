@@ -3,19 +3,22 @@ import pandas as pd
 import optuna
 import json
 import sys
+
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.datasets import load_iris, load_digits
 from sklearn.ensemble import GradientBoostingRegressor
 
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+
 # -------------------------------
 # DISABLE OPTUNA LOGS
 # -------------------------------
-optuna.logging.set_verbosity(optuna.logging.WARNING)
+# optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 # -------------------------------
-# FILE PATHS (ABSOLUTE)
+# FILE PATHS
 # -------------------------------
 OUTPUT_PATH = r"D:\Project\ML\Results\Output\output.txt"
 RESULTS_PATH = r"D:\Project\ML\Results\Output\results.json"
@@ -30,11 +33,13 @@ sys.stdout = log_file
 # META-FEATURE EXTRACTION
 # -------------------------------
 def extract_meta_features(X, y):
+
     num_samples = X.shape[0]
     num_features = X.shape[1]
     num_classes = len(np.unique(y))
 
     unique, counts = np.unique(y, return_counts=True)
+
     imbalance_ratio = counts.max() / counts.min()
     imbalance_ratio = np.log1p(imbalance_ratio)
 
@@ -44,7 +49,14 @@ def extract_meta_features(X, y):
     mean = np.mean(X_scaled)
     std = np.std(X_scaled)
 
-    return [num_samples, num_features, num_classes, imbalance_ratio, mean, std]
+    return [
+        num_samples,
+        num_features,
+        num_classes,
+        imbalance_ratio,
+        mean,
+        std
+    ]
 
 
 # -------------------------------
@@ -57,9 +69,13 @@ digits = load_digits()
 X_digits, y_digits = digits.data, digits.target
 
 df = pd.read_csv(r"D:\Project\ML\Datasets\WineQT.csv")
+
 X_wine = df.drop("quality", axis=1).values
 y_wine = df["quality"].values
 
+# -------------------------------
+# DATASET DICTIONARY
+# -------------------------------
 datasets = {
     "iris": (X_iris, y_iris),
     "digits": (X_digits, y_digits),
@@ -72,18 +88,23 @@ datasets = {
 meta_X = []
 
 for name, (X, y) in datasets.items():
+
     meta = extract_meta_features(X, y)
+
     meta_X.append(meta)
-    print(f"{name} meta-features:", meta)
+
+    print(f"\n{name} meta-features:")
+    print(meta)
 
 meta_X = np.array(meta_X)
 
 # -------------------------------
-# OPTUNA OBJECTIVE
+# OPTUNA OBJECTIVE FUNCTION
 # -------------------------------
 def objective(trial, X, y):
 
     n_estimators = trial.suggest_int("n_estimators", 50, 150)
+
     max_depth = trial.suggest_int("max_depth", 2, 10)
 
     model = RandomForestClassifier(
@@ -93,8 +114,23 @@ def objective(trial, X, y):
         n_jobs=-1
     )
 
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-    score = cross_val_score(model, X, y, cv=cv, scoring="accuracy").mean()
+    # 70-30 split
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.3,
+        random_state=42,
+        stratify=y
+    )
+
+    # Train
+    model.fit(X_train, y_train)
+
+    # Predict
+    y_pred = model.predict(X_test)
+
+    # Accuracy
+    score = accuracy_score(y_test, y_pred)
 
     return score
 
@@ -105,16 +141,24 @@ def objective(trial, X, y):
 results = []
 
 for name, (X, y) in datasets.items():
+
     print(f"\nOptimizing for {name}...")
 
     study = optuna.create_study(direction="maximize")
-    study.optimize(lambda trial: objective(trial, X, y), n_trials=20)
+
+    study.optimize(
+        lambda trial: objective(trial, X, y),
+        n_trials=20
+    )
 
     best_params = study.best_params
     best_score = study.best_value
 
-    print("Best params:", best_params)
-    print("Best accuracy:", best_score)
+    print("\nBest Parameters:")
+    print(best_params)
+
+    print("Best Accuracy:")
+    print(best_score)
 
     results.append({
         "dataset": name,
@@ -128,8 +172,13 @@ for name, (X, y) in datasets.items():
 meta_y = []
 
 for r in results:
+
     params = r["best_params"]
-    meta_y.append([params["n_estimators"], params["max_depth"]])
+
+    meta_y.append([
+        params["n_estimators"],
+        params["max_depth"]
+    ])
 
 meta_y = np.array(meta_y)
 
@@ -143,14 +192,18 @@ print(meta_y)
 # META-LEARNING MODEL
 # -------------------------------
 scaler_meta = StandardScaler()
+
 meta_X_scaled = scaler_meta.fit_transform(meta_X)
 
+# Separate targets
 y_estimators = meta_y[:, 0]
 y_depth = meta_y[:, 1]
 
+# Models
 model_estimators = GradientBoostingRegressor()
 model_depth = GradientBoostingRegressor()
 
+# Train
 model_estimators.fit(meta_X_scaled, y_estimators)
 model_depth.fit(meta_X_scaled, y_depth)
 
@@ -160,24 +213,49 @@ model_depth.fit(meta_X_scaled, y_depth)
 print("\n--- Testing Meta-Learning ---")
 
 meta_test = extract_meta_features(X_iris, y_iris)
+
 meta_test_scaled = scaler_meta.transform([meta_test])
 
-pred_estimators = int(model_estimators.predict(meta_test_scaled)[0])
-pred_depth = int(model_depth.predict(meta_test_scaled)[0])
+# Predict hyperparameters
+pred_estimators = int(
+    model_estimators.predict(meta_test_scaled)[0]
+)
 
-print("\nPredicted hyperparameters:")
+pred_depth = int(
+    model_depth.predict(meta_test_scaled)[0]
+)
+
+print("\nPredicted Hyperparameters:")
 print("n_estimators:", pred_estimators)
 print("max_depth:", pred_depth)
 
+# Final Random Forest model
 model = RandomForestClassifier(
     n_estimators=pred_estimators,
     max_depth=pred_depth,
     random_state=42
 )
 
-score = cross_val_score(model, X_iris, y_iris, cv=3).mean()
+# 70-30 split
+X_train, X_test, y_train, y_test = train_test_split(
+    X_iris,
+    y_iris,
+    test_size=0.3,
+    random_state=42,
+    stratify=y_iris
+)
 
-print("\nAccuracy using meta-learning:", score)
+# Train
+model.fit(X_train, y_train)
+
+# Predict
+y_pred = model.predict(X_test)
+
+# Accuracy
+score = accuracy_score(y_test, y_pred)
+
+print("\nAccuracy using Meta-Learning:")
+print(score)
 
 # -------------------------------
 # SAVE RESULTS
@@ -186,6 +264,7 @@ final_results = {
     "iris": results[0],
     "digits": results[1],
     "wineqt": results[2],
+
     "meta_learning": {
         "n_estimators": pred_estimators,
         "max_depth": pred_depth,
@@ -194,14 +273,16 @@ final_results = {
 }
 
 with open(RESULTS_PATH, "w") as f:
+
     json.dump(final_results, f, indent=4)
 
-print("\nResults saved to results.json")
+print("\nResults saved successfully.")
 
 # -------------------------------
 # RESTORE TERMINAL OUTPUT
 # -------------------------------
 sys.stdout = sys.__stdout__
+
 log_file.close()
 
 print("Output complete.")
